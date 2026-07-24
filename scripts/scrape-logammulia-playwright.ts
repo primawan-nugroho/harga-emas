@@ -31,9 +31,15 @@ async function main() {
   const browser = await chromium.launch();
   const page = await browser.newPage();
 
-  await page.goto("https://www.logammulia.com/id/harga-emas-hari-ini", {
+  const buyRes = await page.goto("https://www.logammulia.com/id/harga-emas-hari-ini", {
     waitUntil: "domcontentloaded",
   });
+  if (!buyRes || buyRes.status() !== 200) {
+    const body = await page.content();
+    throw new Error(
+      `harga-emas-hari-ini returned HTTP ${buyRes?.status()}. Body[0:300]: ${body.slice(0, 300)}`,
+    );
+  }
   const buyText = await page.locator("table").first().innerText();
   const buyMatch = buyText.match(/1 gr\s+([\d,.]+)/);
   if (!buyMatch) throw new Error("1gr buy price row not found on harga-emas-hari-ini");
