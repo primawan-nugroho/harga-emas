@@ -1,0 +1,23 @@
+name: Scrape Logam Mulia (Playwright fallback)
+
+# Runs before the Vercel daily post cron (02:00 UTC / 09:00 WIB) so the
+# scraped price lands in the shared snapshot store in time to be included.
+on:
+  schedule:
+    - cron: "40 1 * * *" # 01:40 UTC == 08:40 WIB
+  workflow_dispatch: {}
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npx tsx scripts/scrape-logammulia-playwright.ts
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

@@ -1,0 +1,47 @@
+/** Canonical, normalized gold-price data shared across the pipeline. */
+
+export type VendorName = "indogold" | "logammulia";
+
+/** One vendor's prices as fetched at a point in time. */
+export interface VendorPrices {
+  vendor: VendorName;
+  /** Buy price (what you pay to buy) for the reference 1g bar, in IDR. */
+  pricePerGram: number;
+  /** Buyback price (what the vendor pays you), in IDR. */
+  buyback: number;
+  /** Optional price ladder by gram size, e.g. { "1": 1300000, "5": 6400000 }. */
+  sizes?: Record<string, number>;
+  /** ISO timestamp when the data was fetched. */
+  fetchedAt: string;
+}
+
+/** Every source implements this so vendors are swappable and testable. */
+export interface GoldSource {
+  readonly name: VendorName;
+  fetchPrices(): Promise<VendorPrices>;
+}
+
+/** A full day's normalized snapshot persisted to the store. */
+export interface DailySnapshot {
+  /** YYYY-MM-DD in Asia/Jakarta. */
+  date: string;
+  vendors: VendorPrices[];
+}
+
+/** Output of the insight layer used to render the image + caption. */
+export interface Analysis {
+  date: string;
+  vendors: VendorPrices[];
+  /** Per-vendor buy/buyback spread in IDR and %. */
+  spreads: Array<{ vendor: VendorName; spreadIdr: number; spreadPct: number }>;
+  /** Cheapest vendor to buy from today. */
+  cheapestToBuy: VendorName;
+  /** Best vendor to sell back to today. */
+  bestToSell: VendorName;
+  /** Day-over-day change of the reference buy price (avg across vendors). */
+  dayChange?: { idr: number; pct: number; direction: "up" | "down" | "flat" };
+  /** Last N reference prices for the sparkline (oldest → newest). */
+  trend: number[];
+  /** Human-readable descriptive insight lines (Bahasa Indonesia). No advice. */
+  insights: string[];
+}
