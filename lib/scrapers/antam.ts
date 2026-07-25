@@ -31,6 +31,25 @@ const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * emasantam.id intermittently 403s (observed on Vercel's egress, not
+ * consistent — a retry from the same host often succeeds seconds later).
+ * A couple of quick retries costs little and avoids falling back to a
+ * stale cached price for a transient blip.
+ */
+async function fetchPriceTableWithRetry(attempts = 3): Promise<Response> {
+  let lastRes: Response | undefined;
+  for (let i = 0; i < attempts; i++) {
+    const res = await fetch(PRICE_TABLE_URL, { headers: { "User-Agent": UA, Accept: "text/html" } });
+    if (res.ok) return res;
+    lastRes = res;
+    if (i < attempts - 1) await sleep(1500 * (i + 1));
+  }
+  return lastRes!;
+}
+
 /** Extract the JABODETABEK section's gramasi -> price (first butik column). */
 function parseJabodetabekLadder(html: string): Record<string, number> {
   const start = html.indexOf("JABODETABEK");
@@ -53,7 +72,7 @@ export const antam: GoldSource = {
   name: "antam",
   async fetchPrices(): Promise<VendorPrices> {
     const [tableRes, comparison] = await Promise.all([
-      fetch(PRICE_TABLE_URL, { headers: { "User-Agent": UA, Accept: "text/html" } }),
+      fetchPriceTableWithRetry(),
       fetchComparisonPricelist(),
     ]);
 
