@@ -5,10 +5,13 @@ import { fetchComparisonPricelist, parseRp } from "./indogold-client";
 /**
  * Antam price — blended from two sources:
  *
- *   - Buy price + size ladder: emasantam.id's official COD pricing API
- *     (https://cod.emasantam.id/api/config/cod-prices), PT Emas Antam
- *     Indonesia's own public JSON endpoint. No auth, no bot protection
- *     (verified 2026-07-25). This is the real, official Antam price.
+ *   - Buy price + size ladder: emasantam.id's official daily price page
+ *     (https://emasantam.id/harga-emas-antam-harian/), specifically the
+ *     "Harga Emas ANTAM Certicard Fine Gold Bar 999.9 — Area JABODETABEK"
+ *     table (per-butik price, uniform across all Jabodetabek butik at a
+ *     given gramasi). The page embeds this table's HTML via a plain,
+ *     unprotected JSON-free include at /content/lm.txt — no bot protection
+ *     (verified 2026-07-25).
  *
  *   - Buyback: emasantam.id publishes no buyback/sell price at all, so this
  *     falls back to IndoGold's "comparison_antamxubs" pricelist, which
@@ -16,38 +19,49 @@ import { fetchComparisonPricelist, parseRp } from "./indogold-client";
  *     sourcing, confirmed with the user as an acceptable trade-off since no
  *     official public Antam buyback feed exists).
  *
- * (Earlier version of this scraper sourced the buy price through IndoGold's
- * comparison too, before emasantam.id's official endpoint was found — see
- * git history. logammulia.com itself remains unreachable from every
- * datacenter IP tested: curl, headless Chromium, Vercel, GitHub Actions.)
+ * (Earlier version of this scraper used emasantam.id's COD delivery pricing
+ * API instead, which includes a delivery-service margin on top of the base
+ * butik price — this JABODETABEK table is the more direct "shelf" price.
+ * logammulia.com itself remains unreachable from every datacenter IP
+ * tested: curl, headless Chromium, Vercel, GitHub Actions.)
  */
 
-const COD_API = "https://cod.emasantam.id/api/config/cod-prices?butik=AJK2";
+const PRICE_TABLE_URL = "https://emasantam.id/content/lm.txt?q=123";
+const UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+  "(KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
-interface CodPriceRow {
-  gramasi: number;
-  harga: number;
-}
-interface CodPricesResponse {
-  data: CodPriceRow[];
+/** Extract the JABODETABEK section's gramasi -> price (first butik column). */
+function parseJabodetabekLadder(html: string): Record<string, number> {
+  const start = html.indexOf("JABODETABEK");
+  if (start < 0) throw new Error("antam: JABODETABEK section not found (site changed?)");
+  const end = html.indexOf("Jawa &amp; Bali", start);
+  const section = end > start ? html.slice(start, end) : html.slice(start);
+
+  const sizes: Record<string, number> = {};
+  const rowRe = /<td class="ar">([\d.]+)<\/td>\s*<td class="ar">Rp ([\d.]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = rowRe.exec(section))) {
+    const gramasi = m[1];
+    const price = Number(m[2].replace(/\./g, ""));
+    if (price > 0) sizes[gramasi] = price;
+  }
+  return sizes;
 }
 
 export const antam: GoldSource = {
   name: "antam",
   async fetchPrices(): Promise<VendorPrices> {
-    const [codRes, comparison] = await Promise.all([
-      fetch(COD_API, { headers: { Accept: "application/json" } }),
+    const [tableRes, comparison] = await Promise.all([
+      fetch(PRICE_TABLE_URL, { headers: { "User-Agent": UA, Accept: "text/html" } }),
       fetchComparisonPricelist(),
     ]);
 
-    if (!codRes.ok) throw new Error(`antam: emasantam.id COD API ${codRes.status}`);
-    const cod = (await codRes.json()) as CodPricesResponse;
-    const oneGramRow = cod.data.find((r) => r.gramasi === 1);
-    if (!oneGramRow) throw new Error("antam: 1g row not found in emasantam.id COD prices");
-    const pricePerGram = oneGramRow.harga;
-
-    const sizes: Record<string, number> = {};
-    for (const row of cod.data) sizes[String(row.gramasi)] = row.harga;
+    if (!tableRes.ok) throw new Error(`antam: emasantam.id price table ${tableRes.status}`);
+    const html = await tableRes.text();
+    const sizes = parseJabodetabekLadder(html);
+    const pricePerGram = sizes["1"];
+    if (!pricePerGram) throw new Error("antam: 1g JABODETABEK price not found (site changed?)");
 
     let buyback: number | undefined;
     if (comparison.status && comparison.data) {
