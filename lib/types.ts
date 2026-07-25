@@ -13,6 +13,9 @@ export interface VendorPrices {
   sizes?: Record<string, number>;
   /** ISO timestamp when the data was fetched. */
   fetchedAt: string;
+  /** True if this entry was carried forward from a prior day (every fetch
+   * attempt failed today) rather than freshly fetched — see pipeline.ts. */
+  carriedForward?: boolean;
 }
 
 /** Every source implements this so vendors are swappable and testable. */

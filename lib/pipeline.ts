@@ -1,4 +1,4 @@
-import type { DailySnapshot, VendorPrices } from "./types";
+import type { DailySnapshot, VendorName, VendorPrices } from "./types";
 import { indoGold } from "./scrapers/indogold";
 import { antam } from "./scrapers/antam";
 import { ubs } from "./scrapers/ubs";
@@ -6,8 +6,7 @@ import { analyze } from "./analyze";
 import { buildCaption } from "./caption";
 import { mergeSnapshot, recentSnapshots } from "./store";
 import { jakartaDate } from "./time";
-
-const VENDOR_COUNT = 3;
+import { VENDOR_ORDER } from "./vendor-labels";
 
 export interface FetchResult {
   vendors: VendorPrices[];
@@ -27,18 +26,47 @@ export async function fetchAllVendors(): Promise<FetchResult> {
   return { vendors, failures };
 }
 
+/**
+ * For any known vendor still missing from today's snapshot (every fetch
+ * attempt failed today), carry forward its most recent price from history
+ * so tomorrow's strict "vs yesterday" comparison never comes up empty for a
+ * vendor that has been seen before. Reuses a real, previously-fetched price
+ * — never fabricates one — flagged with `carriedForward: true`.
+ */
+export function findCarryForward(
+  today: DailySnapshot,
+  history: DailySnapshot[], // newest-last, excludes today
+): VendorPrices[] {
+  const present = new Set(today.vendors.map((v) => v.vendor));
+  const missing = VENDOR_ORDER.filter((v) => !present.has(v));
+  const carried: VendorPrices[] = [];
+  for (const vendor of missing) {
+    for (let i = history.length - 1; i >= 0; i--) {
+      const found = history[i].vendors.find((p) => p.vendor === vendor);
+      if (found) {
+        carried.push({ ...found, carriedForward: true });
+        break;
+      }
+    }
+  }
+  return carried;
+}
+
 export interface DailyResult {
   snapshot: DailySnapshot;
   caption: string;
   analysis: ReturnType<typeof analyze>;
   failures: Array<{ vendor: string; error: string }>;
-  /** True if today's merged snapshot is still missing a vendor (e.g. a
-   * transient failure on one of the fetches). Callers should avoid
-   * publishing an incomplete comparison. */
+  /** Vendors whose price was carried forward from a prior day rather than
+   * freshly fetched today (every attempt today failed). */
+  carriedForward: VendorName[];
+  /** True if today's snapshot is still missing a vendor after fetch +
+   * carry-forward (i.e. that vendor has never once been fetched successfully).
+   * Callers should avoid publishing an incomplete comparison. */
   incomplete: boolean;
 }
 
-/** Fetch → merge into today's stored snapshot → analyze → caption. */
+/** Fetch → carry forward any still-missing vendor → merge into today's stored snapshot → analyze → caption. */
 export async function buildDaily(): Promise<DailyResult> {
   const date = jakartaDate();
   const { vendors, failures } = await fetchAllVendors();
@@ -47,10 +75,24 @@ export async function buildDaily(): Promise<DailyResult> {
     throw new Error(`All vendors failed: ${failures.map((f) => `${f.vendor}: ${f.error}`).join(" | ")}`);
   }
 
-  const snapshot = await mergeSnapshot(date, vendors);
-  const history = await recentSnapshots(7, date);
+  let snapshot = await mergeSnapshot(date, vendors);
+
+  let history = await recentSnapshots(7, date);
+  const carried = findCarryForward(snapshot, history);
+  if (carried.length > 0) {
+    snapshot = await mergeSnapshot(date, carried);
+    history = await recentSnapshots(7, date); // re-fetch in case carry-forward affected it (it doesn't, but stay consistent)
+  }
+
   const analysis = analyze(snapshot, history);
   const caption = buildCaption(analysis);
 
-  return { snapshot, caption, analysis, failures, incomplete: snapshot.vendors.length < VENDOR_COUNT };
+  return {
+    snapshot,
+    caption,
+    analysis,
+    failures,
+    carriedForward: carried.map((v) => v.vendor),
+    incomplete: snapshot.vendors.length < VENDOR_ORDER.length,
+  };
 }
