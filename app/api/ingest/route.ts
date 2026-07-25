@@ -5,11 +5,11 @@ import type { DailySnapshot } from "@/lib/types";
 export const runtime = "nodejs";
 
 /**
- * Fallback ingest endpoint for the GitHub Actions Playwright scraper
- * (used when a vendor requires a real browser, e.g. Akamai-protected
- * logammulia.com). POST a partial DailySnapshot (one or more vendors) with
- * `Authorization: Bearer $CRON_SECRET`; vendors are merged (upserted) into
- * whatever is already stored for that date, not overwritten.
+ * Manual/external ingest endpoint — POST a partial DailySnapshot (one or
+ * more vendors) with `Authorization: Bearer $CRON_SECRET`; vendors are
+ * merged (upserted) into whatever is already stored for that date, not
+ * overwritten. Useful for backfilling or supplying a vendor scraped by an
+ * out-of-band process.
  */
 export async function POST(req: NextRequest) {
   if (req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {

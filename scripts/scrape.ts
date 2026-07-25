@@ -4,10 +4,10 @@
  * against the live sites before wiring the full pipeline.
  */
 import { indoGold } from "../lib/scrapers/indogold";
-import { logamMulia } from "../lib/scrapers/logammulia";
+import { antam } from "../lib/scrapers/antam";
 
 async function run() {
-  for (const src of [logamMulia, indoGold]) {
+  for (const src of [antam, indoGold]) {
     try {
       const prices = await src.fetchPrices();
       console.log(`\n✅ ${src.name}`);

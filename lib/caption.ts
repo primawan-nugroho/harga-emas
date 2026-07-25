@@ -4,7 +4,6 @@ import { idr } from "./time";
 const HASHTAGS = [
   "#hargaemas",
   "#emas",
-  "#logammulia",
   "#antam",
   "#indogold",
   "#investasiemas",
@@ -21,7 +20,7 @@ export function buildCaption(a: Analysis): string {
   lines.push("");
 
   for (const v of a.vendors) {
-    const name = v.vendor === "indogold" ? "IndoGold" : "Logam Mulia";
+    const name = v.vendor === "indogold" ? "IndoGold" : "Antam (via IndoGold)";
     lines.push(`${name}: beli ${idr(v.pricePerGram)}/gr · buyback ${idr(v.buyback)}/gr`);
   }
   lines.push("");
@@ -30,6 +29,7 @@ export function buildCaption(a: Analysis): string {
   lines.push("");
 
   lines.push("⚠️ Info harga bersifat informatif, bukan ajakan/saran investasi.");
+  lines.push("Harga Antam ditampilkan berdasarkan data pembanding dari IndoGold, bukan situs resmi Antam.");
   lines.push("Selalu cek harga resmi di situs masing-masing vendor.");
   lines.push("");
   lines.push(HASHTAGS.join(" "));

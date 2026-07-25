@@ -1,6 +1,6 @@
 import type { DailySnapshot, VendorPrices } from "./types";
 import { indoGold } from "./scrapers/indogold";
-import { logamMulia } from "./scrapers/logammulia";
+import { antam } from "./scrapers/antam";
 import { analyze } from "./analyze";
 import { buildCaption } from "./caption";
 import { mergeSnapshot, recentSnapshots } from "./store";
@@ -13,7 +13,7 @@ export interface FetchResult {
 
 /** Fetch all vendors; tolerate individual vendors failing (reported, not thrown). */
 export async function fetchAllVendors(): Promise<FetchResult> {
-  const sources = [indoGold, logamMulia] as const;
+  const sources = [indoGold, antam] as const;
   const results = await Promise.allSettled(sources.map((s) => s.fetchPrices()));
   const vendors: VendorPrices[] = [];
   const failures: Array<{ vendor: string; error: string }> = [];
@@ -29,17 +29,13 @@ export interface DailyResult {
   caption: string;
   analysis: ReturnType<typeof analyze>;
   failures: Array<{ vendor: string; error: string }>;
-  /** True if today's merged snapshot is still missing a vendor (e.g. the
-   * Akamai-protected Logam Mulia scrape hasn't landed via the GitHub Actions
-   * fallback yet). Callers should avoid publishing an incomplete comparison. */
+  /** True if today's merged snapshot is still missing a vendor (e.g. a
+   * transient failure on one of the two fetches). Callers should avoid
+   * publishing an incomplete comparison. */
   incomplete: boolean;
 }
 
-/**
- * Fetch → merge into today's stored snapshot (so a vendor supplied by the
- * GitHub Actions Playwright fallback earlier today isn't lost) → analyze →
- * caption.
- */
+/** Fetch → merge into today's stored snapshot → analyze → caption. */
 export async function buildDaily(): Promise<DailyResult> {
   const date = jakartaDate();
   const { vendors, failures } = await fetchAllVendors();

@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest) {
 function Card({ a }: { a: Analysis }) {
   const gold = "#C9A227";
   const up = a.dayChange?.direction === "up";
-  const arrow = a.dayChange ? (up ? "▲" : a.dayChange.direction === "down" ? "▼" : "■") : "";
+  const arrow = a.dayChange ? (up ? "NAIK" : a.dayChange.direction === "down" ? "TURUN" : "TETAP") : "";
   return (
     <div
       style={{
@@ -51,7 +51,7 @@ function Card({ a }: { a: Analysis }) {
             }}
           >
             <div style={{ fontSize: 30, color: gold }}>
-              {v.vendor === "indogold" ? "IndoGold" : "Logam Mulia (ANTAM)"}
+              {v.vendor === "indogold" ? "IndoGold" : "Antam (via IndoGold)"}
             </div>
             <div style={{ display: "flex", gap: 48, marginTop: 12 }}>
               <div style={{ display: "flex", flexDirection: "column" }}>

@@ -7,7 +7,7 @@ function snap(date: string, ig: number, lm: number): DailySnapshot {
     date,
     vendors: [
       { vendor: "indogold", pricePerGram: ig, buyback: ig - 60000, fetchedAt: date },
-      { vendor: "logammulia", pricePerGram: lm, buyback: lm - 40000, fetchedAt: date },
+      { vendor: "antam", pricePerGram: lm, buyback: lm - 40000, fetchedAt: date },
     ],
   };
 }
@@ -19,7 +19,7 @@ describe("analyze", () => {
     const a = analyze(today, history);
 
     expect(a.cheapestToBuy).toBe("indogold"); // 1,290,000 < 1,305,000
-    expect(a.bestToSell).toBe("logammulia"); // 1,265,000 > 1,230,000
+    expect(a.bestToSell).toBe("antam"); // 1,265,000 > 1,230,000
     expect(a.dayChange?.direction).toBe("down");
     expect(a.spreads).toHaveLength(2);
     expect(a.trend).toEqual([1_305_000, 1_297_500]); // avg per day

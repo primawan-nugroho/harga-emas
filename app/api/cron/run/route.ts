@@ -34,8 +34,8 @@ export async function GET(req: NextRequest) {
     }
 
     if (incomplete) {
-      // Refuse to publish a one-vendor "comparison" — likely the Akamai-blocked
-      // Logam Mulia scrape hasn't landed yet via the GitHub Actions fallback.
+      // Refuse to publish a one-vendor "comparison" — one of the two fetches
+      // failed this run (transient error, upstream change, etc).
       await notify(
         `⏭️ Skipped publishing ${analysis.date}: only ${analysis.vendors.length} vendor(s) available.${failureNote}`,
       );

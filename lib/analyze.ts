@@ -62,7 +62,7 @@ function buildInsights(
   const lines: string[] = [];
   const label: Record<VendorName, string> = {
     indogold: "IndoGold",
-    logammulia: "Logam Mulia",
+    antam: "Antam",
   };
 
   if (dayChange && dayChange.direction !== "flat") {

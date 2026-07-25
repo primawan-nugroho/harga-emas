@@ -2,7 +2,7 @@ export default function Home() {
   return (
     <main style={{ padding: 48, maxWidth: 640, lineHeight: 1.6 }}>
       <h1>🪙 Harga Emas</h1>
-      <p>Daily gold-price automation: IndoGold vs Logam Mulia (ANTAM) → Instagram.</p>
+      <p>Daily gold-price automation: IndoGold vs Antam → Instagram.</p>
       <ul>
         <li>
           <a href="/api/render">/api/render</a> — preview today&apos;s image (PNG)
@@ -11,7 +11,7 @@ export default function Home() {
           <code>/api/cron/run</code> — daily orchestrator (needs CRON_SECRET)
         </li>
         <li>
-          <code>/api/ingest</code> — snapshot ingest for the Playwright fallback
+          <code>/api/ingest</code> — manual/external snapshot ingest
         </li>
       </ul>
     </main>
