@@ -1,5 +1,5 @@
 import type { Analysis } from "./types";
-import { idr } from "./time";
+import { idr, nowJakartaHHmm } from "./time";
 import { VENDOR_LABEL } from "./vendor-labels";
 
 const HASHTAGS = [
@@ -14,7 +14,7 @@ const HASHTAGS = [
 
 /**
  * Build the Instagram caption (Bahasa Indonesia).
- * Descriptive only + disclaimer. Optionally polish via AI Gateway later.
+ * Descriptive only. Optionally polish via AI Gateway later.
  */
 export function buildCaption(a: Analysis): string {
   const lines: string[] = [];
@@ -22,8 +22,13 @@ export function buildCaption(a: Analysis): string {
   lines.push("");
 
   for (const v of a.vendors) {
+    const change = a.vendorChanges[v.vendor];
+    const changeText =
+      change && change.direction !== "flat"
+        ? ` (${change.direction === "up" ? "naik" : "turun"} ${Math.abs(change.pct).toFixed(2)}% vs kemarin)`
+        : "";
     lines.push(
-      `${VENDOR_LABEL[v.vendor]}: beli ${idr(v.pricePerGram)}/gr · buyback ${idr(v.buyback)}/gr`,
+      `${VENDOR_LABEL[v.vendor]}: beli ${idr(v.pricePerGram)}/gr · buyback ${idr(v.buyback)}/gr${changeText}`,
     );
   }
   lines.push("");
@@ -31,9 +36,10 @@ export function buildCaption(a: Analysis): string {
   for (const line of a.insights) lines.push(`• ${line}`);
   lines.push("");
 
-  lines.push("⚠️ Info harga bersifat informatif, bukan ajakan/saran investasi.");
-  lines.push("Harga beli Antam dari sistem resmi COD Antam; buyback Antam & harga UBS dari data pembanding IndoGold.");
-  lines.push("Selalu cek harga resmi di situs masing-masing vendor.");
+  lines.push(
+    "Harga beli Antam & UBS dari situs resmi masing-masing vendor; buyback Antam & UBS mengacu data pembanding IndoGold.",
+  );
+  lines.push(`Data diambil dari website resmi masing-masing vendor pada pukul ${nowJakartaHHmm()} WIB.`);
   lines.push("");
   lines.push(HASHTAGS.join(" "));
 

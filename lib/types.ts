@@ -28,6 +28,12 @@ export interface DailySnapshot {
   vendors: VendorPrices[];
 }
 
+export interface DayChange {
+  idr: number;
+  pct: number;
+  direction: "up" | "down" | "flat";
+}
+
 /** Output of the insight layer used to render the image + caption. */
 export interface Analysis {
   date: string;
@@ -39,7 +45,9 @@ export interface Analysis {
   /** Best vendor to sell back to today. */
   bestToSell: VendorName;
   /** Day-over-day change of the reference buy price (avg across vendors). */
-  dayChange?: { idr: number; pct: number; direction: "up" | "down" | "flat" };
+  dayChange?: DayChange;
+  /** Day-over-day change of each vendor's own buy price vs yesterday. */
+  vendorChanges: Partial<Record<VendorName, DayChange>>;
   /** Last N reference prices for the sparkline (oldest → newest). */
   trend: number[];
   /** Human-readable descriptive insight lines (Bahasa Indonesia). No advice. */

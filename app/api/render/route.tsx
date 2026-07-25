@@ -1,8 +1,8 @@
 import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
 import { buildDaily } from "@/lib/pipeline";
-import { idr } from "@/lib/time";
-import type { Analysis } from "@/lib/types";
+import { idr, nowJakartaHHmm } from "@/lib/time";
+import type { Analysis, DayChange } from "@/lib/types";
 import { VENDOR_LABEL } from "@/lib/vendor-labels";
 
 export const runtime = "nodejs";
@@ -16,10 +16,17 @@ export async function GET(_req: NextRequest) {
   return new ImageResponse(<Card a={analysis} />, { width: 1080, height: 1350 });
 }
 
+function changeLabel(change: DayChange | undefined): { text: string; color: string } {
+  if (!change || change.direction === "flat") return { text: "", color: "#9c968a" };
+  const up = change.direction === "up";
+  return {
+    text: `${up ? "NAIK" : "TURUN"} ${Math.abs(change.pct).toFixed(2)}% vs kemarin`,
+    color: up ? "#6ee7a8" : "#f28b82",
+  };
+}
+
 function Card({ a }: { a: Analysis }) {
   const gold = "#C9A227";
-  const up = a.dayChange?.direction === "up";
-  const arrow = a.dayChange ? (up ? "NAIK" : a.dayChange.direction === "down" ? "TURUN" : "TETAP") : "";
   return (
     <div
       style={{
@@ -38,39 +45,41 @@ function Card({ a }: { a: Analysis }) {
         <div style={{ fontSize: 26, color: "#9c968a" }}>{formatDate(a.date)}</div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 56 }}>
-        {a.vendors.map((v) => (
-          <div
-            key={v.vendor}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(201,162,39,0.35)",
-              borderRadius: 24,
-              padding: 32,
-            }}
-          >
-            <div style={{ fontSize: 30, color: gold }}>{VENDOR_LABEL[v.vendor]}</div>
-            <div style={{ display: "flex", gap: 48, marginTop: 12 }}>
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                <span style={{ fontSize: 22, color: "#9c968a" }}>Beli / gram</span>
-                <span style={{ fontSize: 46, fontWeight: 700 }}>{idr(v.pricePerGram)}</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 24, marginTop: 48 }}>
+        {a.vendors.map((v) => {
+          const change = changeLabel(a.vendorChanges[v.vendor]);
+          return (
+            <div
+              key={v.vendor}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(201,162,39,0.35)",
+                borderRadius: 24,
+                padding: 32,
+              }}
+            >
+              <div style={{ display: "flex", fontSize: 30, color: gold }}>{VENDOR_LABEL[v.vendor]}</div>
+              <div style={{ display: "flex", gap: 48, marginTop: 12 }}>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  <span style={{ fontSize: 22, color: "#9c968a" }}>Beli / gram</span>
+                  <span style={{ fontSize: 46, fontWeight: 700 }}>{idr(v.pricePerGram)}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  <span style={{ fontSize: 22, color: "#9c968a" }}>Buyback / gram</span>
+                  <span style={{ fontSize: 46, fontWeight: 700 }}>{idr(v.buyback)}</span>
+                </div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                <span style={{ fontSize: 22, color: "#9c968a" }}>Buyback / gram</span>
-                <span style={{ fontSize: 46, fontWeight: 700 }}>{idr(v.buyback)}</span>
-              </div>
+              {change.text && (
+                <div style={{ display: "flex", fontSize: 22, color: change.color, marginTop: 10 }}>
+                  {change.text}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
-
-      {a.dayChange && (
-        <div style={{ display: "flex", fontSize: 30, marginTop: 40, color: up ? "#6ee7a8" : "#f28b82" }}>
-          {arrow} {Math.abs(a.dayChange.pct).toFixed(2)}% vs kemarin
-        </div>
-      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: "auto" }}>
         {a.insights.slice(0, 3).map((line, i) => (
@@ -78,8 +87,11 @@ function Card({ a }: { a: Analysis }) {
             {`• ${line}`}
           </div>
         ))}
-        <div style={{ fontSize: 18, color: "#7a7568", marginTop: 16 }}>
-          Informatif, bukan saran investasi · @hargaemas
+        <div style={{ display: "flex", flexDirection: "column", marginTop: 16 }}>
+          <div style={{ fontSize: 16, color: "#7a7568" }}>
+            {`Data diambil dari website resmi masing-masing vendor pada pukul ${nowJakartaHHmm()} WIB.`}
+          </div>
+          <div style={{ fontSize: 18, color: "#7a7568", marginTop: 6 }}>@harga.emas</div>
         </div>
       </div>
     </div>

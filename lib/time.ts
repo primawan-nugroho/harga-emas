@@ -17,3 +17,9 @@ export function jakartaDate(d: Date = new Date()): string {
 export function idr(n: number): string {
   return "Rp" + Math.round(n).toLocaleString("id-ID");
 }
+
+/** Current time as "HH:mm" in WIB, for "data diambil pukul ..." disclaimers. */
+export function nowJakartaHHmm(): string {
+  const wib = new Date(Date.now() + JAKARTA_OFFSET_MS);
+  return wib.toISOString().slice(11, 16);
+}

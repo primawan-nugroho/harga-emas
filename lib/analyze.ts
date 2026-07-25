@@ -1,5 +1,5 @@
-import type { Analysis, DailySnapshot, VendorName, VendorPrices } from "./types";
-import { VENDOR_LABEL } from "./vendor-labels";
+import type { Analysis, DailySnapshot, DayChange, VendorName, VendorPrices } from "./types";
+import { VENDOR_LABEL, sortByVendorOrder } from "./vendor-labels";
 
 /**
  * Turn today's snapshot (+ recent history) into descriptive insights.
@@ -9,7 +9,7 @@ export function analyze(
   today: DailySnapshot,
   history: DailySnapshot[], // newest-last, excludes today
 ): Analysis {
-  const vendors = today.vendors;
+  const vendors = sortByVendorOrder(today.vendors);
 
   const spreads = vendors.map((v) => {
     const spreadIdr = v.pricePerGram - v.buyback;
@@ -25,15 +25,18 @@ export function analyze(
 
   const refToday = avg(vendors.map((v) => v.pricePerGram));
   const prev = history.at(-1);
-  let dayChange: Analysis["dayChange"];
+  let dayChange: DayChange | undefined;
   if (prev) {
     const refPrev = avg(prev.vendors.map((v) => v.pricePerGram));
-    const diff = refToday - refPrev;
-    dayChange = {
-      idr: diff,
-      pct: (diff / refPrev) * 100,
-      direction: diff > 0 ? "up" : diff < 0 ? "down" : "flat",
-    };
+    dayChange = computeChange(refToday, refPrev);
+  }
+
+  const vendorChanges: Partial<Record<VendorName, DayChange>> = {};
+  if (prev) {
+    for (const v of vendors) {
+      const prevVendor = prev.vendors.find((p) => p.vendor === v.vendor);
+      if (prevVendor) vendorChanges[v.vendor] = computeChange(v.pricePerGram, prevVendor.pricePerGram);
+    }
   }
 
   const trend = [...history, today].map((s) =>
@@ -47,28 +50,29 @@ export function analyze(
     cheapestToBuy,
     bestToSell,
     dayChange,
+    vendorChanges,
     trend,
-    insights: buildInsights(vendors, spreads, cheapestToBuy, bestToSell, dayChange, trend),
+    insights: buildInsights(spreads, cheapestToBuy, bestToSell, trend),
+  };
+}
+
+function computeChange(current: number, previous: number): DayChange {
+  const diff = current - previous;
+  return {
+    idr: diff,
+    pct: (diff / previous) * 100,
+    direction: diff > 0 ? "up" : diff < 0 ? "down" : "flat",
   };
 }
 
 function buildInsights(
-  vendors: VendorPrices[],
   spreads: Analysis["spreads"],
   cheapestToBuy: VendorName,
   bestToSell: VendorName,
-  dayChange: Analysis["dayChange"],
   trend: number[],
 ): string[] {
   const lines: string[] = [];
   const label = VENDOR_LABEL;
-
-  if (dayChange && dayChange.direction !== "flat") {
-    const arrow = dayChange.direction === "up" ? "naik" : "turun";
-    lines.push(
-      `Harga emas ${arrow} ${Math.abs(dayChange.pct).toFixed(2)}% dibanding kemarin.`,
-    );
-  }
 
   lines.push(`Termurah untuk beli hari ini: ${label[cheapestToBuy]}.`);
   lines.push(`Buyback terbaik hari ini: ${label[bestToSell]}.`);

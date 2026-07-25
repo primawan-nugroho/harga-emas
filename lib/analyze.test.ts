@@ -29,6 +29,13 @@ describe("analyze", () => {
     expect(a.spreads).toHaveLength(3);
     expect(a.trend).toEqual([avgBuy(history[0]), avgBuy(today)]);
     expect(a.insights.length).toBeGreaterThan(0);
+
+    // per-vendor change: indogold 1,290,000 vs yesterday 1,300,000 -> down
+    expect(a.vendorChanges.indogold?.direction).toBe("down");
+    // antam 1,305,000 vs yesterday 1,310,000 -> down
+    expect(a.vendorChanges.antam?.direction).toBe("down");
+    // display order is antam, ubs, indogold
+    expect(a.vendors.map((v) => v.vendor)).toEqual(["antam", "ubs", "indogold"]);
   });
 
   it("detects a 3-day down streak", () => {
