@@ -36,6 +36,23 @@ describe("analyze", () => {
     expect(a.vendorChanges.antam?.direction).toBe("down");
     // display order is antam, ubs, indogold
     expect(a.vendors.map((v) => v.vendor)).toEqual(["antam", "ubs", "indogold"]);
+
+    // per-vendor trend: 2-day series (history then today), oldest -> newest
+    expect(a.vendorTrends.indogold).toEqual([1_300_000, 1_290_000]);
+    expect(a.vendorTrends.antam).toEqual([1_310_000, 1_305_000]);
+  });
+
+  it("omits a vendor's trend/change when absent from yesterday's snapshot", () => {
+    const yesterday: DailySnapshot = {
+      date: "2026-07-21",
+      vendors: [{ vendor: "indogold", pricePerGram: 1_300_000, buyback: 1_240_000, fetchedAt: "2026-07-21" }],
+    };
+    const today = snap("2026-07-22", 1_290_000, 1_305_000);
+    const a = analyze(today, [yesterday]);
+
+    expect(a.vendorChanges.antam).toBeUndefined();
+    expect(a.vendorTrends.antam).toEqual([1_305_000]); // only today, since antam wasn't tracked yesterday
+    expect(a.vendorChanges.indogold?.direction).toBe("down");
   });
 
   it("detects a 3-day down streak", () => {

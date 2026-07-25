@@ -50,6 +50,8 @@ export interface Analysis {
   vendorChanges: Partial<Record<VendorName, DayChange>>;
   /** Last N reference prices for the sparkline (oldest → newest). */
   trend: number[];
+  /** Each vendor's own last-N-day buy price series (oldest → newest), for its sparkline. */
+  vendorTrends: Partial<Record<VendorName, number[]>>;
   /** Human-readable descriptive insight lines (Bahasa Indonesia). No advice. */
   insights: string[];
 }

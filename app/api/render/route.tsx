@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { buildDaily } from "@/lib/pipeline";
 import { idr, nowJakartaHHmm } from "@/lib/time";
 import type { Analysis, DayChange } from "@/lib/types";
-import { VENDOR_LABEL } from "@/lib/vendor-labels";
+import { VENDOR_LABEL, VENDOR_LOGO, logoDisplaySize } from "@/lib/vendor-labels";
 
 export const runtime = "nodejs";
 
@@ -23,6 +23,33 @@ function changeLabel(change: DayChange | undefined): { text: string; color: stri
     text: `${up ? "NAIK" : "TURUN"} ${Math.abs(change.pct).toFixed(2)}% vs kemarin`,
     color: up ? "#6ee7a8" : "#f28b82",
   };
+}
+
+/** SVG path `d` for a small sparkline from a price series (oldest -> newest). */
+function sparklinePath(values: number[], width: number, height: number): string {
+  if (values.length < 2) return "";
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const stepX = width / (values.length - 1);
+  const points = values.map((v, i) => {
+    const x = i * stepX;
+    const y = height - ((v - min) / range) * height;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  return `M${points.join(" L")}`;
+}
+
+function Sparkline({ values, color }: { values: number[]; color: string }) {
+  const width = 140;
+  const height = 40;
+  const d = sparklinePath(values, width, height);
+  if (!d) return null;
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <path d={d} stroke={color} strokeWidth={3} fill="none" />
+    </svg>
+  );
 }
 
 function Card({ a }: { a: Analysis }) {
@@ -48,6 +75,7 @@ function Card({ a }: { a: Analysis }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 24, marginTop: 48 }}>
         {a.vendors.map((v) => {
           const change = changeLabel(a.vendorChanges[v.vendor]);
+          const trend = a.vendorTrends[v.vendor] ?? [];
           return (
             <div
               key={v.vendor}
@@ -60,7 +88,16 @@ function Card({ a }: { a: Analysis }) {
                 padding: 32,
               }}
             >
-              <div style={{ display: "flex", fontSize: 30, color: gold }}>{VENDOR_LABEL[v.vendor]}</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={VENDOR_LOGO[v.vendor]} {...logoDisplaySize(v.vendor, 34)} />
+                  <div style={{ display: "flex", fontSize: 30, color: gold }}>{VENDOR_LABEL[v.vendor]}</div>
+                </div>
+                {trend.length >= 2 && (
+                  <Sparkline values={trend} color={change.color !== "#9c968a" ? change.color : "#C9A227"} />
+                )}
+              </div>
               <div style={{ display: "flex", gap: 48, marginTop: 12 }}>
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   <span style={{ fontSize: 22, color: "#9c968a" }}>Beli / gram</span>

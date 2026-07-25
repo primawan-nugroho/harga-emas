@@ -43,6 +43,14 @@ export function analyze(
     avg(s.vendors.map((v) => v.pricePerGram)),
   );
 
+  const vendorTrends: Partial<Record<VendorName, number[]>> = {};
+  for (const v of vendors) {
+    const series = [...history, today]
+      .map((s) => s.vendors.find((p) => p.vendor === v.vendor)?.pricePerGram)
+      .filter((p): p is number => p != null);
+    if (series.length > 0) vendorTrends[v.vendor] = series;
+  }
+
   return {
     date: today.date,
     vendors,
@@ -52,6 +60,7 @@ export function analyze(
     dayChange,
     vendorChanges,
     trend,
+    vendorTrends,
     insights: buildInsights(spreads, cheapestToBuy, bestToSell, trend),
   };
 }
