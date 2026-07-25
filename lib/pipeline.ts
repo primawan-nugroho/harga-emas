@@ -1,10 +1,13 @@
 import type { DailySnapshot, VendorPrices } from "./types";
 import { indoGold } from "./scrapers/indogold";
 import { antam } from "./scrapers/antam";
+import { ubs } from "./scrapers/ubs";
 import { analyze } from "./analyze";
 import { buildCaption } from "./caption";
 import { mergeSnapshot, recentSnapshots } from "./store";
 import { jakartaDate } from "./time";
+
+const VENDOR_COUNT = 3;
 
 export interface FetchResult {
   vendors: VendorPrices[];
@@ -13,7 +16,7 @@ export interface FetchResult {
 
 /** Fetch all vendors; tolerate individual vendors failing (reported, not thrown). */
 export async function fetchAllVendors(): Promise<FetchResult> {
-  const sources = [indoGold, antam] as const;
+  const sources = [indoGold, antam, ubs] as const;
   const results = await Promise.allSettled(sources.map((s) => s.fetchPrices()));
   const vendors: VendorPrices[] = [];
   const failures: Array<{ vendor: string; error: string }> = [];
@@ -30,7 +33,7 @@ export interface DailyResult {
   analysis: ReturnType<typeof analyze>;
   failures: Array<{ vendor: string; error: string }>;
   /** True if today's merged snapshot is still missing a vendor (e.g. a
-   * transient failure on one of the two fetches). Callers should avoid
+   * transient failure on one of the fetches). Callers should avoid
    * publishing an incomplete comparison. */
   incomplete: boolean;
 }
@@ -49,5 +52,5 @@ export async function buildDaily(): Promise<DailyResult> {
   const analysis = analyze(snapshot, history);
   const caption = buildCaption(analysis);
 
-  return { snapshot, caption, analysis, failures, incomplete: snapshot.vendors.length < 2 };
+  return { snapshot, caption, analysis, failures, incomplete: snapshot.vendors.length < VENDOR_COUNT };
 }

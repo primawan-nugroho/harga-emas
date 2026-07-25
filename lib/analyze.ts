@@ -1,4 +1,5 @@
 import type { Analysis, DailySnapshot, VendorName, VendorPrices } from "./types";
+import { VENDOR_LABEL } from "./vendor-labels";
 
 /**
  * Turn today's snapshot (+ recent history) into descriptive insights.
@@ -60,10 +61,7 @@ function buildInsights(
   trend: number[],
 ): string[] {
   const lines: string[] = [];
-  const label: Record<VendorName, string> = {
-    indogold: "IndoGold",
-    antam: "Antam",
-  };
+  const label = VENDOR_LABEL;
 
   if (dayChange && dayChange.direction !== "flat") {
     const arrow = dayChange.direction === "up" ? "naik" : "turun";

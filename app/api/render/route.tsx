@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { buildDaily } from "@/lib/pipeline";
 import { idr } from "@/lib/time";
 import type { Analysis } from "@/lib/types";
+import { VENDOR_LABEL } from "@/lib/vendor-labels";
 
 export const runtime = "nodejs";
 
@@ -50,9 +51,7 @@ function Card({ a }: { a: Analysis }) {
               padding: 32,
             }}
           >
-            <div style={{ fontSize: 30, color: gold }}>
-              {v.vendor === "indogold" ? "IndoGold" : "Antam (via IndoGold)"}
-            </div>
+            <div style={{ fontSize: 30, color: gold }}>{VENDOR_LABEL[v.vendor]}</div>
             <div style={{ display: "flex", gap: 48, marginTop: 12 }}>
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <span style={{ fontSize: 22, color: "#9c968a" }}>Beli / gram</span>

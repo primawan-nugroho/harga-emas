@@ -1,6 +1,6 @@
 /** Canonical, normalized gold-price data shared across the pipeline. */
 
-export type VendorName = "indogold" | "antam";
+export type VendorName = "indogold" | "antam" | "ubs";
 
 /** One vendor's prices as fetched at a point in time. */
 export interface VendorPrices {

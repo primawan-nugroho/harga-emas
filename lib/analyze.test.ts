@@ -8,8 +8,13 @@ function snap(date: string, ig: number, lm: number): DailySnapshot {
     vendors: [
       { vendor: "indogold", pricePerGram: ig, buyback: ig - 60000, fetchedAt: date },
       { vendor: "antam", pricePerGram: lm, buyback: lm - 40000, fetchedAt: date },
+      { vendor: "ubs", pricePerGram: lm - 20000, buyback: lm - 70000, fetchedAt: date },
     ],
   };
+}
+
+function avgBuy(s: DailySnapshot): number {
+  return s.vendors.reduce((sum, v) => sum + v.pricePerGram, 0) / s.vendors.length;
 }
 
 describe("analyze", () => {
@@ -18,11 +23,11 @@ describe("analyze", () => {
     const today = snap("2026-07-22", 1_290_000, 1_305_000);
     const a = analyze(today, history);
 
-    expect(a.cheapestToBuy).toBe("indogold"); // 1,290,000 < 1,305,000
-    expect(a.bestToSell).toBe("antam"); // 1,265,000 > 1,230,000
+    expect(a.cheapestToBuy).toBe("ubs"); // 1,285,000 (lm - 20,000) is lowest buy price
+    expect(a.bestToSell).toBe("antam"); // 1,265,000 is highest buyback
     expect(a.dayChange?.direction).toBe("down");
-    expect(a.spreads).toHaveLength(2);
-    expect(a.trend).toEqual([1_305_000, 1_297_500]); // avg per day
+    expect(a.spreads).toHaveLength(3);
+    expect(a.trend).toEqual([avgBuy(history[0]), avgBuy(today)]);
     expect(a.insights.length).toBeGreaterThan(0);
   });
 

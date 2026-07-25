@@ -1,13 +1,14 @@
 /**
  * Offline scraper check: `npm run scrape`
- * Runs both scrapers and prints normalized JSON. Use this to verify endpoints
+ * Runs all scrapers and prints normalized JSON. Use this to verify endpoints
  * against the live sites before wiring the full pipeline.
  */
 import { indoGold } from "../lib/scrapers/indogold";
 import { antam } from "../lib/scrapers/antam";
+import { ubs } from "../lib/scrapers/ubs";
 
 async function run() {
-  for (const src of [antam, indoGold]) {
+  for (const src of [antam, indoGold, ubs]) {
     try {
       const prices = await src.fetchPrices();
       console.log(`\n✅ ${src.name}`);
