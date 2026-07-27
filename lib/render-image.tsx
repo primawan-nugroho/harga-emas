@@ -12,33 +12,17 @@ function directionColor(direction: DayChange["direction"]): string {
   return direction === "up" ? "#6ee7a8" : direction === "down" ? "#f28b82" : "#9c968a";
 }
 
-/** Small CSS-drawn triangle (up/down) or dash (flat) — avoids relying on a
- * unicode arrow glyph, which Satori's default font doesn't render (tofu box). */
+/** Small triangle (up/down) or dash (flat), drawn as an SVG polygon rather
+ * than the classic CSS transparent-border trick — that trick renders as a
+ * solid square in Satori (tested, both shorthand and longhand border props),
+ * but SVG shapes render correctly here (same mechanism the sparkline uses). */
 function DirectionIcon({ direction, color }: { direction: DayChange["direction"]; color: string }) {
-  if (direction === "up") {
+  if (direction === "up" || direction === "down") {
+    const points = direction === "up" ? "7,0 14,12 0,12" : "0,0 14,0 7,12";
     return (
-      <div
-        style={{
-          width: 0,
-          height: 0,
-          borderLeft: "7px solid transparent",
-          borderRight: "7px solid transparent",
-          borderBottom: `12px solid ${color}`,
-        }}
-      />
-    );
-  }
-  if (direction === "down") {
-    return (
-      <div
-        style={{
-          width: 0,
-          height: 0,
-          borderLeft: "7px solid transparent",
-          borderRight: "7px solid transparent",
-          borderTop: `12px solid ${color}`,
-        }}
-      />
+      <svg width={14} height={12} viewBox="0 0 14 12">
+        <polygon points={points} fill={color} />
+      </svg>
     );
   }
   return <div style={{ width: 14, height: 4, borderRadius: 2, background: color }} />;
