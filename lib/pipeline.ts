@@ -28,10 +28,17 @@ export async function fetchAllVendors(): Promise<FetchResult> {
 
 /**
  * For any known vendor still missing from today's snapshot (every fetch
- * attempt failed today), carry forward its most recent price from history
- * so tomorrow's strict "vs yesterday" comparison never comes up empty for a
- * vendor that has been seen before. Reuses a real, previously-fetched price
- * — never fabricates one — flagged with `carriedForward: true`.
+ * attempt failed today), carry forward its price from *yesterday only* —
+ * capped to one day old — so tomorrow's strict "vs yesterday" comparison
+ * doesn't come up empty after a single bad day. Reuses a real,
+ * previously-fetched price — never fabricates one — flagged with
+ * `carriedForward: true`.
+ *
+ * Deliberately does not search further back than yesterday, and refuses to
+ * carry forward an entry that was itself carried forward: staleness must
+ * never compound across multiple days (a vendor blocked for 2+ days in a
+ * row simply goes missing/incomplete rather than silently showing an
+ * increasingly stale price as if it were current).
  */
 export function findCarryForward(
   today: DailySnapshot,
@@ -39,14 +46,14 @@ export function findCarryForward(
 ): VendorPrices[] {
   const present = new Set(today.vendors.map((v) => v.vendor));
   const missing = VENDOR_ORDER.filter((v) => !present.has(v));
+  const yesterday = history.at(-1);
+  if (!yesterday) return [];
+
   const carried: VendorPrices[] = [];
   for (const vendor of missing) {
-    for (let i = history.length - 1; i >= 0; i--) {
-      const found = history[i].vendors.find((p) => p.vendor === vendor);
-      if (found) {
-        carried.push({ ...found, carriedForward: true });
-        break;
-      }
+    const found = yesterday.vendors.find((p) => p.vendor === vendor);
+    if (found && !found.carriedForward) {
+      carried.push({ ...found, carriedForward: true });
     }
   }
   return carried;

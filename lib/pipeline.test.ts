@@ -7,10 +7,13 @@ function priced(vendor: "indogold" | "antam" | "ubs", price: number, date: strin
 }
 
 describe("findCarryForward", () => {
-  it("carries forward a vendor missing from today using its most recent prior price", () => {
+  it("carries forward a vendor missing from today using yesterday's price", () => {
     const history: DailySnapshot[] = [
       { date: "2026-07-23", vendors: [priced("antam", 2_600_000, "2026-07-23")] },
-      { date: "2026-07-24", vendors: [priced("indogold", 2_400_000, "2026-07-24")] }, // antam absent this day
+      {
+        date: "2026-07-24",
+        vendors: [priced("indogold", 2_400_000, "2026-07-24"), priced("antam", 2_605_000, "2026-07-24")],
+      },
     ];
     const today: DailySnapshot = { date: "2026-07-25", vendors: [priced("indogold", 2_410_000, "2026-07-25")] };
 
@@ -21,8 +24,37 @@ describe("findCarryForward", () => {
     expect(carried).toHaveLength(1);
     const antamCarry = carried.find((v) => v.vendor === "antam");
     expect(antamCarry).toBeDefined();
-    expect(antamCarry?.pricePerGram).toBe(2_600_000); // from 07-23, the most recent day antam appears
+    expect(antamCarry?.pricePerGram).toBe(2_605_000); // from 07-24 (yesterday), not the older 07-23 value
     expect(antamCarry?.carriedForward).toBe(true);
+  });
+
+  it("does not carry forward beyond yesterday (caps staleness at 1 day)", () => {
+    const history: DailySnapshot[] = [
+      { date: "2026-07-23", vendors: [priced("antam", 2_600_000, "2026-07-23")] },
+      { date: "2026-07-24", vendors: [priced("indogold", 2_400_000, "2026-07-24")] }, // antam absent this day
+    ];
+    const today: DailySnapshot = { date: "2026-07-25", vendors: [priced("indogold", 2_410_000, "2026-07-25")] };
+
+    // antam is absent from yesterday (07-24) too, so nothing is carried even
+    // though it does appear further back on 07-23 — that would compound
+    // staleness silently, which is exactly what capping prevents.
+    expect(findCarryForward(today, history).find((v) => v.vendor === "antam")).toBeUndefined();
+  });
+
+  it("does not chain a carry-forward into a second day", () => {
+    const history: DailySnapshot[] = [
+      {
+        date: "2026-07-24",
+        vendors: [
+          priced("indogold", 2_400_000, "2026-07-24"),
+          { ...priced("antam", 2_600_000, "2026-07-23"), carriedForward: true },
+        ],
+      },
+    ];
+    const today: DailySnapshot = { date: "2026-07-25", vendors: [priced("indogold", 2_410_000, "2026-07-25")] };
+
+    // yesterday's antam entry was itself carried forward -> refuse to chain
+    expect(findCarryForward(today, history).find((v) => v.vendor === "antam")).toBeUndefined();
   });
 
   it("returns nothing for a vendor that has never once appeared in history", () => {

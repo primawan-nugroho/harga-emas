@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
 import { buildDaily } from "@/lib/pipeline";
+import { renderCardImage } from "@/lib/render-image";
+import { uploadDailyImage } from "@/lib/image-store";
 import { publishToInstagram } from "@/lib/instagram";
 import { notify } from "@/lib/notify";
 
@@ -20,10 +22,14 @@ export async function GET(req: NextRequest) {
   try {
     const { caption, analysis, failures, incomplete, carriedForward } = await buildDaily();
 
-    // Public PNG URL for the Graph API. In prod: render then upload to Blob and
-    // use that URL. Here we point at our own /api/render (must be public https).
-    const origin = new URL(req.url).origin;
-    const imageUrl = `${origin}/api/render?d=${analysis.date}`;
+    // Render once and upload to Blob for a stable, publicly-fetchable URL.
+    // Previously this pointed at ${req.url origin}/api/render, but Vercel
+    // Cron invokes the per-deployment URL, which sits behind Deployment
+    // Protection — Instagram's fetch got a login redirect instead of an
+    // image and every publish silently failed (see image-store.ts).
+    const imageBuffer = await renderCardImage(analysis).arrayBuffer();
+    const imageUrl = await uploadDailyImage(analysis.date, imageBuffer);
+
     const failureNote = failures.length
       ? `\n⚠️ ${failures.map((f) => `${f.vendor} failed: ${f.error}`).join("; ")}`
       : "";
@@ -47,7 +53,7 @@ export async function GET(req: NextRequest) {
 
     const { mediaId } = await publishToInstagram({ imageUrl, caption });
     await notify(`✅ Published ${analysis.date} (media ${mediaId})${failureNote}${carryNote}`);
-    return Response.json({ ok: true, mediaId, failures, carriedForward });
+    return Response.json({ ok: true, mediaId, imageUrl, failures, carriedForward });
   } catch (e) {
     await notify(`❌ Daily run failed: ${String(e)}`);
     return Response.json({ error: String(e) }, { status: 500 });
