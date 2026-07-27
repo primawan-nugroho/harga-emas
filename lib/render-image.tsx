@@ -8,13 +8,68 @@ export function renderCardImage(a: Analysis): ImageResponse {
   return new ImageResponse(<Card a={a} />, { width: 1080, height: 1350 });
 }
 
-function changeLabel(change: DayChange | undefined): { text: string; color: string } {
-  if (!change || change.direction === "flat") return { text: "", color: "#9c968a" };
-  const up = change.direction === "up";
-  return {
-    text: `${up ? "NAIK" : "TURUN"} ${Math.abs(change.pct).toFixed(2)}% vs kemarin`,
-    color: up ? "#6ee7a8" : "#f28b82",
-  };
+function directionColor(direction: DayChange["direction"]): string {
+  return direction === "up" ? "#6ee7a8" : direction === "down" ? "#f28b82" : "#9c968a";
+}
+
+/** Small CSS-drawn triangle (up/down) or dash (flat) — avoids relying on a
+ * unicode arrow glyph, which Satori's default font doesn't render (tofu box). */
+function DirectionIcon({ direction, color }: { direction: DayChange["direction"]; color: string }) {
+  if (direction === "up") {
+    return (
+      <div
+        style={{
+          width: 0,
+          height: 0,
+          borderLeft: "7px solid transparent",
+          borderRight: "7px solid transparent",
+          borderBottom: `12px solid ${color}`,
+        }}
+      />
+    );
+  }
+  if (direction === "down") {
+    return (
+      <div
+        style={{
+          width: 0,
+          height: 0,
+          borderLeft: "7px solid transparent",
+          borderRight: "7px solid transparent",
+          borderTop: `12px solid ${color}`,
+        }}
+      />
+    );
+  }
+  return <div style={{ width: 14, height: 4, borderRadius: 2, background: color }} />;
+}
+
+/** Badge shown to the right of each vendor's name: is today's price up,
+ * down, or unchanged vs yesterday. Only renders once a real prior-day price
+ * exists to compare against (see pipeline.ts's carry-forward for why that
+ * might briefly be missing after a multi-day vendor outage). */
+function DirectionBadge({ change }: { change: DayChange | undefined }) {
+  if (!change) return null;
+  const color = directionColor(change.direction);
+  const label =
+    change.direction === "up" ? "NAIK" : change.direction === "down" ? "TURUN" : "TETAP";
+  const pct = change.direction === "flat" ? "" : ` ${Math.abs(change.pct).toFixed(2)}%`;
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        background: "rgba(255,255,255,0.06)",
+        border: `1px solid ${color}66`,
+        borderRadius: 12,
+        padding: "8px 14px",
+      }}
+    >
+      <DirectionIcon direction={change.direction} color={color} />
+      <div style={{ display: "flex", fontSize: 20, color, fontWeight: 700 }}>{`${label}${pct}`}</div>
+    </div>
+  );
 }
 
 /** SVG path `d` for a small sparkline from a price series (oldest -> newest). */
@@ -66,8 +121,9 @@ function Card({ a }: { a: Analysis }) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 24, marginTop: 48 }}>
         {a.vendors.map((v) => {
-          const change = changeLabel(a.vendorChanges[v.vendor]);
+          const change = a.vendorChanges[v.vendor];
           const trend = a.vendorTrends[v.vendor] ?? [];
+          const sparkColor = change ? directionColor(change.direction) : "#C9A227";
           return (
             <div
               key={v.vendor}
@@ -86,25 +142,21 @@ function Card({ a }: { a: Analysis }) {
                   <img src={VENDOR_LOGO[v.vendor]} {...logoDisplaySize(v.vendor, 34)} />
                   <div style={{ display: "flex", fontSize: 30, color: gold }}>{VENDOR_LABEL[v.vendor]}</div>
                 </div>
-                {trend.length >= 2 && (
-                  <Sparkline values={trend} color={change.color !== "#9c968a" ? change.color : "#C9A227"} />
-                )}
+                <DirectionBadge change={change} />
               </div>
-              <div style={{ display: "flex", gap: 48, marginTop: 12 }}>
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  <span style={{ fontSize: 22, color: "#9c968a" }}>Beli / gram</span>
-                  <span style={{ fontSize: 46, fontWeight: 700 }}>{idr(v.pricePerGram)}</span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
+                <div style={{ display: "flex", gap: 48 }}>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <span style={{ fontSize: 22, color: "#9c968a" }}>Beli / gram</span>
+                    <span style={{ fontSize: 46, fontWeight: 700 }}>{idr(v.pricePerGram)}</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <span style={{ fontSize: 22, color: "#9c968a" }}>Buyback / gram</span>
+                    <span style={{ fontSize: 46, fontWeight: 700 }}>{idr(v.buyback)}</span>
+                  </div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  <span style={{ fontSize: 22, color: "#9c968a" }}>Buyback / gram</span>
-                  <span style={{ fontSize: 46, fontWeight: 700 }}>{idr(v.buyback)}</span>
-                </div>
+                {trend.length >= 2 && <Sparkline values={trend} color={sparkColor} />}
               </div>
-              {change.text && (
-                <div style={{ display: "flex", fontSize: 22, color: change.color, marginTop: 10 }}>
-                  {change.text}
-                </div>
-              )}
             </div>
           );
         })}
