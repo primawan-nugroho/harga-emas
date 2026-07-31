@@ -83,6 +83,10 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
   );
 }
 
+function fmtPct(pct: number): string {
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+}
+
 function Card({ a }: { a: Analysis }) {
   const gold = "#C9A227";
   return (
@@ -141,6 +145,11 @@ function Card({ a }: { a: Analysis }) {
                 </div>
                 {trend.length >= 2 && <Sparkline values={trend} color={sparkColor} />}
               </div>
+              {a.worldPremium[v.vendor] != null && (
+                <div style={{ display: "flex", fontSize: 20, color: "#9c968a", marginTop: 10 }}>
+                  {`${fmtPct(a.worldPremium[v.vendor]!)} vs harga dunia`}
+                </div>
+              )}
             </div>
           );
         })}
@@ -152,6 +161,19 @@ function Card({ a }: { a: Analysis }) {
             {`• ${line}`}
           </div>
         ))}
+        {a.worldPrice && (
+          <div style={{ display: "flex", fontSize: 20, color: "#cfc9bb" }}>
+            {`• Harga emas dunia: ${idr(a.worldPrice.idrPerGram)}/gr (COMEX, kurs ${Math.round(a.worldPrice.usdIdr).toLocaleString("id-ID")})`}
+          </div>
+        )}
+        {a.bestSizePremiumVendor && (
+          <div style={{ display: "flex", fontSize: 20, color: "#cfc9bb" }}>
+            {(() => {
+              const info = a.sizePremium[a.bestSizePremiumVendor]!;
+              return `• ${VENDOR_LABEL[a.bestSizePremiumVendor]} pecahan ${info.smallestSize}g lebih mahal ${fmtPct(info.premiumPct)} per gram vs ${info.largestSize}g.`;
+            })()}
+          </div>
+        )}
         <div style={{ display: "flex", flexDirection: "column", marginTop: 16 }}>
           <div style={{ fontSize: 16, color: "#7a7568" }}>
             {`Data diambil dari website resmi masing-masing vendor pada pukul ${nowJakartaHHmm()} WIB.`}

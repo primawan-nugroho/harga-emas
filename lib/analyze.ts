@@ -1,4 +1,11 @@
-import type { Analysis, DailySnapshot, DayChange, VendorName, VendorPrices } from "./types";
+import type {
+  Analysis,
+  DailySnapshot,
+  DayChange,
+  SizePremiumInfo,
+  VendorName,
+  VendorPrices,
+} from "./types";
 import { VENDOR_LABEL, sortByVendorOrder } from "./vendor-labels";
 
 /**
@@ -51,6 +58,21 @@ export function analyze(
     if (series.length > 0) vendorTrends[v.vendor] = series;
   }
 
+  const worldPremium: Partial<Record<VendorName, number>> = {};
+  if (today.worldPrice) {
+    const worldPerGram = today.worldPrice.idrPerGram;
+    for (const v of vendors) {
+      worldPremium[v.vendor] = (v.pricePerGram / worldPerGram - 1) * 100;
+    }
+  }
+
+  const sizePremium: Partial<Record<VendorName, SizePremiumInfo>> = {};
+  for (const v of vendors) {
+    const info = computeSizePremium(v);
+    if (info) sizePremium[v.vendor] = info;
+  }
+  const bestSizePremiumVendor = pickBestSizePremiumVendor(sizePremium);
+
   return {
     date: today.date,
     vendors,
@@ -62,7 +84,45 @@ export function analyze(
     trend,
     vendorTrends,
     insights: buildInsights(spreads, cheapestToBuy, bestToSell, trend),
+    worldPrice: today.worldPrice,
+    worldPremium,
+    sizePremium,
+    bestSizePremiumVendor,
   };
+}
+
+/**
+ * Small bars cost more per gram than large bars — a real, actionable fact
+ * for buyers, computed from data we already scrape (`sizes`) but had never
+ * surfaced. Needs at least 2 distinct sizes to be meaningful.
+ */
+function computeSizePremium(v: VendorPrices): SizePremiumInfo | undefined {
+  if (!v.sizes) return undefined;
+  const entries = Object.entries(v.sizes)
+    .map(([size, total]) => ({ size, grams: Number(size), perGram: total / Number(size) }))
+    .filter((e) => e.grams > 0 && Number.isFinite(e.perGram));
+  if (entries.length < 2) return undefined;
+
+  entries.sort((a, b) => a.grams - b.grams);
+  const smallest = entries[0];
+  const largest = entries[entries.length - 1];
+
+  return {
+    smallestSize: smallest.size,
+    smallestPerGram: smallest.perGram,
+    largestSize: largest.size,
+    largestPerGram: largest.perGram,
+    premiumPct: (smallest.perGram / largest.perGram - 1) * 100,
+  };
+}
+
+/** The single most notable size-premium fact across vendors, for the one-line headline. */
+function pickBestSizePremiumVendor(
+  sizePremium: Partial<Record<VendorName, SizePremiumInfo>>,
+): VendorName | undefined {
+  const entries = Object.entries(sizePremium) as Array<[VendorName, SizePremiumInfo]>;
+  if (entries.length === 0) return undefined;
+  return entries.reduce((best, cur) => (cur[1].premiumPct > best[1].premiumPct ? cur : best))[0];
 }
 
 function computeChange(current: number, previous: number): DayChange {

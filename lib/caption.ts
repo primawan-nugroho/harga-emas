@@ -36,6 +36,31 @@ export function buildCaption(a: Analysis): string {
   for (const line of a.insights) lines.push(`• ${line}`);
   lines.push("");
 
+  const premiumEntries = a.vendors
+    .map((v) => {
+      const pct = a.worldPremium[v.vendor];
+      return pct == null ? null : `${VENDOR_LABEL[v.vendor]} ${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+    })
+    .filter((s): s is string => s != null);
+  if (a.worldPrice && premiumEntries.length > 0) {
+    lines.push("Selisih terhadap harga emas dunia hari ini:");
+    lines.push(`• ${premiumEntries.join(" · ")}`);
+    lines.push("");
+    lines.push(
+      "Catatan: selisih ini mencakup biaya cetak, sertifikat, distribusi, dan pajak — bukan semata keuntungan penjual.",
+    );
+    lines.push("Acuan dunia: COMEX gold futures & kurs USD/IDR.");
+    lines.push("");
+  }
+
+  if (a.bestSizePremiumVendor) {
+    const info = a.sizePremium[a.bestSizePremiumVendor]!;
+    lines.push(
+      `Tahukah kamu: ${VENDOR_LABEL[a.bestSizePremiumVendor]} pecahan ${info.smallestSize}g lebih mahal ${info.premiumPct >= 0 ? "+" : ""}${info.premiumPct.toFixed(1)}% per gram dibanding pecahan ${info.largestSize}g.`,
+    );
+    lines.push("");
+  }
+
   lines.push(
     "Harga beli Antam & UBS dari situs resmi masing-masing vendor; buyback Antam & UBS mengacu data pembanding IndoGold.",
   );

@@ -1,7 +1,8 @@
-import type { DailySnapshot, VendorName, VendorPrices } from "./types";
+import type { DailySnapshot, VendorName, VendorPrices, WorldPrice } from "./types";
 import { indoGold } from "./scrapers/indogold";
 import { antam } from "./scrapers/antam";
 import { ubs } from "./scrapers/ubs";
+import { fetchWorldPrice } from "./scrapers/world-gold";
 import { analyze } from "./analyze";
 import { buildCaption } from "./caption";
 import { mergeSnapshot, recentSnapshots } from "./store";
@@ -73,6 +74,23 @@ export interface DailyResult {
   incomplete: boolean;
 }
 
+/**
+ * World gold price is optional — unlike a missing vendor, a failed fetch
+ * here must never block the daily post. Reported into the same `failures`
+ * array as vendor failures (vendor: "world") so it's visible in Telegram
+ * alerts and the durable run log without affecting `incomplete`.
+ */
+async function fetchWorldPriceTolerant(): Promise<{
+  worldPrice?: WorldPrice;
+  failure?: { vendor: string; error: string };
+}> {
+  try {
+    return { worldPrice: await fetchWorldPrice() };
+  } catch (e) {
+    return { failure: { vendor: "world", error: String(e) } };
+  }
+}
+
 /** Fetch → carry forward any still-missing vendor → merge into today's stored snapshot → analyze → caption. */
 export async function buildDaily(): Promise<DailyResult> {
   const date = jakartaDate();
@@ -82,7 +100,10 @@ export async function buildDaily(): Promise<DailyResult> {
     throw new Error(`All vendors failed: ${failures.map((f) => `${f.vendor}: ${f.error}`).join(" | ")}`);
   }
 
-  let snapshot = await mergeSnapshot(date, vendors);
+  const { worldPrice, failure: worldFailure } = await fetchWorldPriceTolerant();
+  if (worldFailure) failures.push(worldFailure);
+
+  let snapshot = await mergeSnapshot(date, vendors, worldPrice);
 
   let history = await recentSnapshots(7, date);
   const carried = findCarryForward(snapshot, history);

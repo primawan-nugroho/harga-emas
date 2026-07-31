@@ -24,17 +24,41 @@ export interface GoldSource {
   fetchPrices(): Promise<VendorPrices>;
 }
 
+/** International gold reference price, converted to IDR/gram for comparison. */
+export interface WorldPrice {
+  /** COMEX gold futures (GC=F), USD per troy ounce. A close proxy for spot,
+   * not identical (contango) — label accordingly in copy. */
+  usdPerOz: number;
+  usdIdr: number;
+  /** Derived: usdPerOz * usdIdr / 31.1034768 (troy oz -> gram). */
+  idrPerGram: number;
+  fetchedAt: string;
+}
+
 /** A full day's normalized snapshot persisted to the store. */
 export interface DailySnapshot {
   /** YYYY-MM-DD in Asia/Jakarta. */
   date: string;
   vendors: VendorPrices[];
+  /** Optional — a failed fetch simply omits this; never blocks the post
+   * (unlike a missing vendor, which does). See lib/pipeline.ts. */
+  worldPrice?: WorldPrice;
 }
 
 export interface DayChange {
   idr: number;
   pct: number;
   direction: "up" | "down" | "flat";
+}
+
+/** Per-vendor "small bars cost more per gram" fact, derived from `sizes`. */
+export interface SizePremiumInfo {
+  smallestSize: string;
+  smallestPerGram: number;
+  largestSize: string;
+  largestPerGram: number;
+  /** How much more the smallest size costs per gram vs the largest, in %. */
+  premiumPct: number;
 }
 
 /** Output of the insight layer used to render the image + caption. */
@@ -57,4 +81,12 @@ export interface Analysis {
   vendorTrends: Partial<Record<VendorName, number[]>>;
   /** Human-readable descriptive insight lines (Bahasa Indonesia). No advice. */
   insights: string[];
+  /** World gold reference, if fetched successfully today (see WorldPrice). */
+  worldPrice?: WorldPrice;
+  /** Per-vendor premium vs world price, in % ((local/world - 1) * 100). Empty if worldPrice missing. */
+  worldPremium: Partial<Record<VendorName, number>>;
+  /** Per-vendor size-ladder premium (small bars cost more per gram). Only for vendors with 2+ sizes. */
+  sizePremium: Partial<Record<VendorName, SizePremiumInfo>>;
+  /** The single vendor with the largest size premium, for the one-line headline. */
+  bestSizePremiumVendor?: VendorName;
 }

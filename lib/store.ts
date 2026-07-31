@@ -1,4 +1,4 @@
-import type { DailySnapshot } from "./types";
+import type { DailySnapshot, WorldPrice } from "./types";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -40,15 +40,25 @@ export async function getSnapshot(date: string): Promise<DailySnapshot | null> {
  * by one path (e.g. Vercel) coexist with a vendor scraped by another (e.g.
  * the GitHub Actions Playwright fallback for Akamai-protected sources)
  * without either overwriting the other.
+ *
+ * `worldPrice` is optional and upserted the same way: pass it when freshly
+ * fetched, omit it to keep whatever was already stored for that date (e.g.
+ * the carry-forward merge call in pipeline.ts, which never re-fetches world
+ * price, must not wipe out a value an earlier call already set today).
  */
 export async function mergeSnapshot(
   date: string,
   newVendors: DailySnapshot["vendors"],
+  worldPrice?: WorldPrice,
 ): Promise<DailySnapshot> {
   const existing = await getSnapshot(date);
   const byName = new Map((existing?.vendors ?? []).map((v) => [v.vendor, v]));
   for (const v of newVendors) byName.set(v.vendor, v);
-  const merged: DailySnapshot = { date, vendors: [...byName.values()] };
+  const merged: DailySnapshot = {
+    date,
+    vendors: [...byName.values()],
+    worldPrice: worldPrice ?? existing?.worldPrice,
+  };
   await saveSnapshot(merged);
   return merged;
 }

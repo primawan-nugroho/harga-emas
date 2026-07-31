@@ -6,6 +6,7 @@
 import { indoGold } from "../lib/scrapers/indogold";
 import { antam } from "../lib/scrapers/antam";
 import { ubs } from "../lib/scrapers/ubs";
+import { fetchWorldPrice } from "../lib/scrapers/world-gold";
 
 async function run() {
   for (const src of [antam, indoGold, ubs]) {
@@ -16,6 +17,14 @@ async function run() {
     } catch (e) {
       console.error(`\n❌ ${src.name}:`, String(e));
     }
+  }
+
+  try {
+    const world = await fetchWorldPrice();
+    console.log(`\n✅ world-gold`);
+    console.log(JSON.stringify(world, null, 2));
+  } catch (e) {
+    console.error(`\n❌ world-gold:`, String(e));
   }
 }
 
