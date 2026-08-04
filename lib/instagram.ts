@@ -1,9 +1,15 @@
 /**
  * Instagram publishing via the Graph API.
  *
- * Flow:
+ * Single image flow:
  *   1) POST /{IG_USER_ID}/media  { image_url, caption }  -> { id: creationId }
  *   2) POST /{IG_USER_ID}/media_publish { creation_id }  -> { id: mediaId }
+ *
+ * Carousel flow (2-10 images):
+ *   1) POST /{IG_USER_ID}/media { image_url, is_carousel_item: true }  per image -> child id
+ *   2) POST /{IG_USER_ID}/media { media_type: "CAROUSEL", children: <ids>, caption } -> parent id
+ *      (the caption goes on the parent container, not the children)
+ *   3) POST /{IG_USER_ID}/media_publish { creation_id: parent id } -> { id: mediaId }
  *
  * Requirements:
  *   - IG Business/Creator account linked to a Facebook Page
@@ -25,15 +31,56 @@ export async function publishToInstagram({
   const userId = required("IG_USER_ID");
   const token = required("IG_ACCESS_TOKEN");
 
-  // 1) Create media container
   const container = await graph(`${GRAPH}/${userId}/media`, {
     image_url: imageUrl,
     caption,
     access_token: token,
   });
-  const creationId = container.id as string;
+  const mediaId = await publishCreation(userId, token, container.id as string);
+  return { mediaId };
+}
 
-  // 2) Publish (small retry: container may need a moment to be ready)
+/**
+ * Publishes a carousel (2-10 images) with the caption on the parent
+ * container. Callers should keep a single-image fallback for when this
+ * fails — see app/api/cron/run/route.ts, where extra slides beyond the
+ * proven daily card are strictly additive and must never block the post.
+ */
+export async function publishCarouselToInstagram({
+  imageUrls,
+  caption,
+}: {
+  imageUrls: string[];
+  caption: string;
+}): Promise<{ mediaId: string }> {
+  if (imageUrls.length < 2 || imageUrls.length > 10) {
+    throw new Error(`carousel needs 2-10 images, got ${imageUrls.length}`);
+  }
+  const userId = required("IG_USER_ID");
+  const token = required("IG_ACCESS_TOKEN");
+
+  const childIds: string[] = [];
+  for (const imageUrl of imageUrls) {
+    const child = await graph(`${GRAPH}/${userId}/media`, {
+      image_url: imageUrl,
+      is_carousel_item: "true",
+      access_token: token,
+    });
+    childIds.push(child.id as string);
+  }
+
+  const parent = await graph(`${GRAPH}/${userId}/media`, {
+    media_type: "CAROUSEL",
+    children: childIds.join(","),
+    caption,
+    access_token: token,
+  });
+  const mediaId = await publishCreation(userId, token, parent.id as string);
+  return { mediaId };
+}
+
+/** Shared publish step (with retry — the container may need a moment to be ready). */
+async function publishCreation(userId: string, token: string, creationId: string): Promise<string> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
@@ -41,7 +88,7 @@ export async function publishToInstagram({
         creation_id: creationId,
         access_token: token,
       });
-      return { mediaId: published.id as string };
+      return published.id as string;
     } catch (e) {
       lastErr = e;
       await sleep(2000 * (attempt + 1));

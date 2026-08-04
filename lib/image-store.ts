@@ -10,9 +10,10 @@
  * for Instagram's fetcher than a live-rendering endpoint with a scrape-heavy
  * cold start (~9s observed).
  */
-export async function uploadDailyImage(date: string, png: ArrayBuffer): Promise<string> {
+export async function uploadDailyImage(date: string, png: ArrayBuffer, slide?: string): Promise<string> {
   const { put } = await import("@vercel/blob");
-  const { url } = await put(`images/${date}.png`, png, {
+  const suffix = slide ? `-${slide}` : "";
+  const { url } = await put(`images/${date}${suffix}.png`, png, {
     access: "public",
     contentType: "image/png",
     addRandomSuffix: false,

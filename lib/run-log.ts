@@ -9,12 +9,25 @@ export interface RunLogEntry {
   date: string;
   /** ISO timestamp of when this run executed. */
   timestamp: string;
-  status: "published" | "skipped" | "dry_run" | "error";
+  status:
+    | "published"
+    | "skipped"
+    | "dry_run"
+    | "error"
+    | "token_refreshed"
+    | "token_refresh_manual";
   vendors: string[];
   failures: Array<{ vendor: string; error: string }>;
   carriedForward: string[];
   mediaId?: string;
   error?: string;
+  /** Number of carousel slides published (1 = single image, the daily card
+   * alone). Extra slides are additive-only — see app/api/cron/run/route.ts —
+   * so a value of 1 here can mean either no extra slides were attempted, or
+   * one was attempted and gracefully fell back. */
+  slides?: number;
+  /** Free-text context for non-post log entries (e.g. token refresh). */
+  note?: string;
 }
 
 export async function appendRunLog(entry: RunLogEntry): Promise<void> {

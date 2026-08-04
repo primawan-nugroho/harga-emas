@@ -1,6 +1,8 @@
 import type { NextRequest } from "next/server";
 import { refreshLongLivedToken, persistTokenToVercel } from "@/lib/meta-token";
 import { notify } from "@/lib/notify";
+import { appendRunLog } from "@/lib/run-log";
+import { jakartaDate } from "@/lib/time";
 
 export const runtime = "nodejs";
 
@@ -15,6 +17,9 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  const date = jakartaDate();
+  const timestamp = new Date().toISOString();
+
   try {
     const { accessToken, expiresInSeconds } = await refreshLongLivedToken();
     const mode = await persistTokenToVercel(accessToken);
@@ -22,15 +27,43 @@ export async function GET(req: NextRequest) {
 
     if (mode === "updated") {
       await notify(`🔑 IG token refreshed automatically, valid ~${days} more days.`);
+      await appendRunLog({
+        date,
+        timestamp,
+        status: "token_refreshed",
+        vendors: [],
+        failures: [],
+        carriedForward: [],
+        note: `valid ~${days} more days`,
+      });
     } else {
       await notify(
         `🔑 IG token refreshed (valid ~${days} days) but VERCEL_API_TOKEN/VERCEL_PROJECT_ID ` +
           `not set — update IG_ACCESS_TOKEN manually:\n${accessToken}`,
       );
+      await appendRunLog({
+        date,
+        timestamp,
+        status: "token_refresh_manual",
+        vendors: [],
+        failures: [],
+        carriedForward: [],
+        note: `valid ~${days} days — needs manual paste into IG_ACCESS_TOKEN`,
+      });
     }
     return Response.json({ ok: true, mode, expiresInDays: days });
   } catch (e) {
     await notify(`❌ Token refresh failed: ${String(e)}`);
+    await appendRunLog({
+      date,
+      timestamp,
+      status: "error",
+      vendors: [],
+      failures: [],
+      carriedForward: [],
+      error: String(e),
+      note: "token refresh",
+    });
     return Response.json({ error: String(e) }, { status: 500 });
   }
 }
